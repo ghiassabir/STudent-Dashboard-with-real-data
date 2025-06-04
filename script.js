@@ -1,6 +1,6 @@
 // --- Constants for Data Files ---
-const AGGREGATED_SCORES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR22OeWtUj1ODFBbVBaiSfsp4anSLyfGk2r5JWKu-9TPwklSoiCk4Qste_zDMAsoTCpOPG7qGLj7wOc/pub?gid=671815293&single=true&output=csv';
-const QUESTION_DETAILS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR22OeWtUj1ODFBbVBaiSfsp4anSLyfGk2r5JWKu-9TPwklSoiCk4Qste_zDMAsoTCpOPG7qGLj7wOc/pub?gid=171497066&single=true&output=csv';
+const AGGREGATED_SCORES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSySYBO9YL3N4aUG3JEYZMQQIv9d1oSm3ba4Ty9Gt4SsGs2zmTS_k81rH3Qv41mZvClnayNcDpl_QbI/pub?gid=1890969747&single=true&output=csv';
+const QUESTION_DETAILS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSySYBO9YL3N4aUG3JEYZMQQIv9d1oSm3ba4Ty9Gt4SsGs2zmTS_k81rH3Qv41mZvClnayNcDpl_QbI/pub?gid=822014112&single=true&output=csv';
 
 // This will hold the processed data for the logged-in student
 let currentStudentData = {};
