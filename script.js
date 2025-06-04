@@ -3,21 +3,19 @@ const AGGREGATED_SCORES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PAC
 const QUESTION_DETAILS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSySYBO9YL3N4aUG3JEYZMQQIv9d1oSm3ba4Ty9Gt4SsGs2zmTS_k81rH3Qv41mZvClnayNcDpl_QbI/pub?gid=822014112&single=true&output=csv';
 
 let currentStudentData = {};
-let allAggregatedData = [];
-let allQuestionDetailsData = [];
+let allAggregatedData = []; 
+let allQuestionDetailsData = []; 
 
 // Predefined EOC Chapters - !!! USER MUST UPDATE THESE TO MATCH THEIR CURRICULUM !!!
-// These names should match the result of cleanAssessmentName(feedAssessmentName)
 const eocChapters = {
     reading: ["Vocabulary in Context", "Making the Leap", "The Big Picture", "Literal Comprehension", "Reading for Function", "Supporting & Undermining", "Graphs & Charts", "Paired Passages"],
     writing: ["Transitions", "Specific Focus", "Sentences & Fragments", "Joining & Separating Sentences", "Non-Essential & Essential Clauses", "Verbs Agreements and Tense", "Pronouns", "Modification", "Parallel Structure"],
     math: ["Exponents & Radicals", "Percent", "Rates", "Ratio & Proportion", "Expressions", "Constructing Models", "Manipulating & Solving Equations", "Systems of Equations", "Inequalities", "Lines", "Functions", "Quadratics", "Angles", "Triangles", "Circles", "Trigonometry", "Probability", "Statistics 1"]
 };
 
-// Predefined Standard CB Test Names - !!! USER CAN UPDATE THESE !!!
 const standardCbTestNames = [
-    "Diagnostic Test", // Expects DG-T0 in feed
-    "CB Practice Test 4",  // Expects CB-T4 in feed
+    "Diagnostic Test", 
+    "CB Practice Test 4",
     "CB Practice Test 5",
     "CB Practice Test 6",
     "CB Practice Test 7",
@@ -26,30 +24,25 @@ const standardCbTestNames = [
     "CB Practice Test 10"
 ];
 
-// Mapping from AssessmentName in FEED to standard display names for CB Tests
-// !!! USER MUST UPDATE THIS MAPPING BASED ON THEIR FEED DATA !!!
 const feedNameToStandardTestName = {
     "DG-T0": "Diagnostic Test",
     "CB-T4": "CB Practice Test 4",
-    "CB-T5": "CB Practice Test 5", // Example, add if you have T5, T6 etc.
+    "CB-T5": "CB Practice Test 5", 
     "CB-T6": "CB Practice Test 6",
-    // Add mappings for T7-T10 if they exist in your feed with similar patterns
+    // Add mappings for T7-T10
 };
 
-// Mapping from AGGREGATE CB Test AssessmentName (from feed) to its constituent MODULE AssessmentNames (from feed)
-// !!! USER MUST UPDATE THIS MAPPING BASED ON THEIR FEED DATA !!!
 const aggregateTestToModulesMap = {
     "CB-T4": ["CB-T4-E1", "CB-T4-E2", "CB-T4-M1", "CB-T4-M2"],
-    "DG-T0": ["DG-T0-E1", "DG-T0-E2", "DG-T0-M1", "DG-T0-M2"], // Example for diagnostic
-    // Add other aggregate tests if applicable
+    "DG-T0": ["DG-T0-E1", "DG-T0-E2", "DG-T0-M1", "DG-T0-M2"], 
+    // Add others if needed
 };
 
-
-// --- Date Formatting Helper ---
+// --- Helper Functions ---
 function formatDate(dateString) {
     if (!dateString || dateString === "N/A" || dateString === "Not Attempted" || String(dateString).toLowerCase().includes("invalid date")) return "N/A";
     try {
-        let cleanedDateString = String(dateString); // Ensure it's a string
+        let cleanedDateString = String(dateString);
         if (cleanedDateString.includes(" GMT")) {
             cleanedDateString = cleanedDateString.substring(0, cleanedDateString.indexOf(" GMT"));
         }
@@ -60,16 +53,15 @@ function formatDate(dateString) {
                  const year = parseInt(parts[0]);
                  const month = parseInt(parts[1]) -1;
                  const day = parseInt(parts[2]);
-                 // Use Date.UTC to avoid local timezone interpretation issues when only date is relevant
-                 const composedDate = new Date(Date.UTC(year, month, day));
+                 const composedDate = new Date(Date.UTC(year, month, day)); 
                  if (!isNaN(composedDate.getTime())) {
                      return `${composedDate.getUTCDate()} ${composedDate.toLocaleString('default', { month: 'short', timeZone: 'UTC' })}, ${composedDate.getUTCFullYear()}`;
                  }
              }
             console.warn("Could not format date (attempt 1 failed for):", dateString);
-            return String(dateString).split(" ")[0] || "N/A"; // Return original date part or N/A
+            return String(dateString).split(" ")[0] || "N/A";
         }
-        const day = date.getUTCDate(); // Use UTC to be consistent
+        const day = date.getUTCDate();
         const month = date.toLocaleString('default', { month: 'short', timeZone: 'UTC' });
         const year = date.getUTCFullYear();
         return `${day} ${month}, ${year}`;
@@ -78,6 +70,28 @@ function formatDate(dateString) {
         return String(dateString).split(" ")[0] || "N/A";
     }
 }
+
+function cleanAssessmentName(assessmentName) {
+    if (typeof assessmentName !== 'string') return "Unknown Assessment";
+    let cleaned = assessmentName.replace(/^[RWM]-EOC-C\d+-/i, '');
+    cleaned = cleaned.replace(/^-+|-+$/g, '').trim();
+    return cleaned || assessmentName; 
+}
+
+function inferSubject(assessmentName) { // <<<< --- ADDED THIS FUNCTION ---
+    if (typeof assessmentName !== 'string') return null;
+    const nameLower = assessmentName.toLowerCase();
+    if (nameLower.startsWith('r-eoc') || nameLower.includes('reading') || nameLower.includes('vocab') || nameLower.includes('evidence')) return 'reading';
+    if (nameLower.startsWith('w-eoc') || nameLower.includes('writing') || nameLower.includes('language') || nameLower.includes('gramm') || nameLower.includes('conventions')) return 'writing';
+    if (nameLower.startsWith('m-eoc') || nameLower.includes('math') || nameLower.includes('alg') || nameLower.includes('geom')) return 'math';
+    // For CB module names like CB-T4-E1, CB-T4-M2
+    if (nameLower.startsWith('cb-') || nameLower.startsWith('dg-')) {
+        if (nameLower.includes('-e')) return 'reading'; // Assuming E modules are Reading/Writing related for broad category
+        if (nameLower.includes('-m')) return 'math';
+    }
+    return null; 
+}
+
 
 document.addEventListener('DOMContentLoaded', function () {
     let loggedInStudentGmailID = localStorage.getItem('loggedInStudentGmailID');
@@ -95,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function setupEventListeners() {
+    // ... (event listener setup code remains the same as previous version) ...
     const mainTabs = document.querySelectorAll('.main-tab-button');
     const mainTabContents = document.querySelectorAll('.main-tab-content');
     const hamburgerButton = document.getElementById('hamburgerButton');
@@ -209,7 +224,7 @@ async function loadAndProcessData(loggedInStudentGmailID) {
         console.log("Aggregated Data Raw (first 5 for all students):", allAggregatedData.slice(0,5));
         console.log("Question Details Raw (first 5 for all students):", allQuestionDetailsData.slice(0,5));
 
-        currentStudentData = transformDataForDashboard(allAggregatedData, allQuestionDetailsData, loggedInStudentGmailID);
+        currentStudentData = transformDataForDashboard(allAggregatedData, allQuestionDetailsData, loggedInStudentGmailID); // Error was here
         
         if (currentStudentData && currentStudentData.isDataAvailable) {
             displayData(currentStudentData);
@@ -225,39 +240,27 @@ async function loadAndProcessData(loggedInStudentGmailID) {
             document.getElementById('studentNameDisplay').textContent = `Welcome, ${studentNameToDisplay} (No performance data found)`;
         }
 
-    } catch (error) {
-        console.error("Error loading or parsing CSV data:", error);
+    } catch (error) { // This catch block was triggered
+        console.error("Error loading or parsing CSV data:", error); // This line logged the error
         alert("A critical error occurred while loading dashboard data. Please check the console for details.");
         document.getElementById('studentNameDisplay').textContent = `Error loading data.`;
     }
 }
 
-function cleanAssessmentName(assessmentName) {
-    if (typeof assessmentName !== 'string') return "Unknown Assessment";
-    // Remove prefixes like R-EOC-C#- or M-EOC-C#- etc. and leading/trailing hyphens/spaces
-    let cleaned = assessmentName.replace(/^[RWM]-EOC-C\d+-/i, ''); // Case-insensitive prefix removal
-    cleaned = cleaned.replace(/^-+|-+$/g, '').trim(); // Remove leading/trailing hyphens and trim
-    return cleaned || assessmentName; // Return original if cleaning results in empty string
-}
-
-
 function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, loggedInStudentGmailID) {
+    // ... (transformDataForDashboard function from the previous successful script version, with cleanAssessmentName and inferSubject now available)
+    // The changes made in the previous version of this function for EOC display and CB Test display will be retained.
     const studentAggregated = aggregatedDataArray.filter(row => row.StudentGmailID === loggedInStudentGmailID);
     const studentQuestions = questionDetailsArray.filter(row => row.StudentGmailID === loggedInStudentGmailID);
 
     let studentDisplayName = loggedInStudentGmailID; 
-    // Student_Mapping sheet should be the source of truth for names.
-    // If Apps Script added StudentName_Canvas/Full to aggregated feed, we could use it.
-    // For now, this needs to be improved if a display name other than GmailID is required without a separate mapping fetch.
-    // We'll assume studentAggregated might have a name if Apps Script was modified to include it.
      if (studentAggregated.length > 0 && studentAggregated[0].StudentName_Full) { 
         studentDisplayName = studentAggregated[0].StudentName_Full;
     } else if (studentAggregated.length > 0 && studentAggregated[0].StudentName_Canvas) { 
         studentDisplayName = studentAggregated[0].StudentName_Canvas;
     }
 
-
-    if (studentAggregated.length === 0 && studentQuestions.length === 0) { // Check both, as student might have questions but no aggregated scores yet or vice-versa
+    if (studentAggregated.length === 0 && studentQuestions.length === 0) {
         console.warn("No aggregated or question data found for student:", loggedInStudentGmailID);
         return { 
             name: studentDisplayName, 
@@ -267,7 +270,7 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
 
     let transformed = {
         name: studentDisplayName,
-        targetScore: "N/A", // Placeholder - this should come from Student_Mapping
+        targetScore: "N/A", 
         latestScores: { total: "N/A", rw: "N/A", math: "N/A", avgEocPractice: "N/A" },
         classAveragesGlobal: { total: "N/A", rw: "N/A", math: "N/A", avgEocPractice: "N/A" },
         scoreTrend: { labels: [], studentScores: [], classAvgScores: [] },
@@ -275,16 +278,15 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         strengths: [],
         improvements: [],
         cbPracticeTests: [],
-        eocQuizzes: { reading: [], writing: [], math: [] }, // Will be populated with full chapter lists
+        eocQuizzes: { reading: [], writing: [], math: [] }, 
         khanAcademy: { reading: [], writing: [], math: [] },
         cbSkills: { reading: [], writing: [], math: [] },
         questionDetails: studentQuestions,
         isDataAvailable: true
     };
     
-    // Populate Latest Scores & Class Averages (Overview)
     const studentCbTestAggregates = studentAggregated.filter(r => r.AssessmentSource === 'Canvas CB Test');
-    studentCbTestAggregates.sort((a,b) => { /* existing robust date sort */
+    studentCbTestAggregates.sort((a,b) => { 
         const dateA = new Date(a.AttemptDate === "N/A" || !a.AttemptDate ? 0 : a.AttemptDate);
         const dateB = new Date(b.AttemptDate === "N/A" || !b.AttemptDate ? 0 : b.AttemptDate);
         const validA = !isNaN(dateA.getTime()) && a.AttemptDate !== "N/A" && a.AttemptDate;
@@ -300,8 +302,8 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         transformed.latestScores.rw = latestTest.ScaledScore_RW || "N/A";
         transformed.latestScores.math = latestTest.ScaledScore_Math || "N/A";
         transformed.classAveragesGlobal.total = latestTest.ClassAverageScore_Normalized || "N/A";
-        transformed.classAveragesGlobal.rw = "N/A"; // Feed doesn't have specific class avg scaled R/W
-        transformed.classAveragesGlobal.math = "N/A"; // Feed doesn't have specific class avg scaled Math
+        transformed.classAveragesGlobal.rw = "N/A"; 
+        transformed.classAveragesGlobal.math = "N/A";
     }
 
     const studentEocEntries = studentAggregated.filter(r => r.AssessmentSource === 'Canvas EOC Practice' && r.Score_Percentage);
@@ -310,7 +312,7 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         transformed.latestScores.avgEocPractice = (studentEocPercentages.reduce((a,b) => a + b, 0) / studentEocPercentages.length).toFixed(0) + '%';
     }
     
-    const allEocClassAvgsPercentages = allAggregatedData // Use allAggregatedData for broader class average
+    const allEocClassAvgsPercentages = allAggregatedData 
         .filter(r => r.AssessmentSource === 'Canvas EOC Practice' && r.ClassAverageScore_Normalized && String(r.ClassAverageScore_Normalized).includes('%'))
         .map(r => parseFloat(String(r.ClassAverageScore_Normalized).replace('%', '')))
         .filter(p => !isNaN(p));
@@ -318,7 +320,6 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         transformed.classAveragesGlobal.avgEocPractice = (allEocClassAvgsPercentages.reduce((a,b) => a+b, 0) / allEocClassAvgsPercentages.length).toFixed(0) + '%';
     }
 
-    // Populate Score Trend (using student's CB Test Aggregates)
     studentCbTestAggregates.slice().reverse().forEach(test => { 
         transformed.scoreTrend.labels.push(test.AssessmentName);
         transformed.scoreTrend.studentScores.push(parseFloat(test.ScaledScore_Total) || null);
@@ -326,8 +327,7 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         transformed.scoreTrend.classAvgScores.push( !isNaN(classAvgNorm) ? (classAvgNorm / 100 * 1600) : null );
     });
 
-    // Populate Overall Skill Performance & Strengths/Improvements (Basic - relies on good skill tags)
-    const skillToCategory = (skillTag) => { /* ... same as before ... */ 
+    const skillToCategory = (skillTag) => { 
         if (!skillTag || typeof skillTag !== 'string') return 'Unknown';
         const tag = skillTag.toLowerCase().trim();
         if (tag === 'tbd' || tag.startsWith('tbd_')) return 'Unknown'; 
@@ -351,8 +351,8 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         studentSkillPerformance[category].total += pointsPossible;
 
         if (!isNaN(classAvgPoints) && pointsPossible > 0) {
-             const classPerfOnQuestion = (classAvgPoints / pointsPossible); // Fraction 0-1
-             classSkillPerformanceCalc[category].totalWeightedAvg += classPerfOnQuestion * pointsPossible; // Weight by points possible
+             const classPerfOnQuestion = (classAvgPoints / pointsPossible); 
+             classSkillPerformanceCalc[category].totalWeightedAvg += classPerfOnQuestion * pointsPossible; 
              classSkillPerformanceCalc[category].totalWeights += pointsPossible;
         }
         
@@ -373,12 +373,11 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
 
     transformed.overallSkillPerformance.studentAccuracy = Object.values(studentSkillPerformance).map(subj => {
         return subj.total > 0 ? parseFloat((subj.correct / subj.total * 100).toFixed(0)) : 0;
-    }).slice(0,3); // Only take Reading, W&L, Math
+    }).slice(0,3); 
     
     transformed.overallSkillPerformance.classAvgAccuracy = Object.values(classSkillPerformanceCalc).map(subj => {
         return subj.totalWeights > 0 ? parseFloat((subj.totalWeightedAvg / subj.totalWeights * 100).toFixed(0)) : 0;
     }).slice(0,3);
-
 
     const skillDetailsArray = [];
     for (const skillName in granularSkills) {
@@ -394,7 +393,6 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
 
     // --- Populate CB Practice Tests Table (Structured by predefined list) ---
     transformed.cbPracticeTests = standardCbTestNames.map(standardName => {
-        // Find the corresponding feed name for this standard display name
         let feedNameForThisStandardTest = null;
         for (const key in feedNameToStandardTestName) {
             if (feedNameToStandardTestName[key] === standardName) {
@@ -410,7 +408,8 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
 
         if (testAttempt) {
             return {
-                name: standardName, // Use the standard display name
+                name: standardName, 
+                originalFeedName: testAttempt.AssessmentName, // Store for modal
                 date: formatDate(testAttempt.AttemptDate),
                 rw: testAttempt.ScaledScore_RW || '-',
                 math: testAttempt.ScaledScore_Math || '-',
@@ -420,29 +419,41 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
                 classAvgTotal: testAttempt.ClassAverageScore_Normalized || '-'
             };
         } else {
-            return { name: standardName, date: "N/A", rw: '-', math: '-', total: '-', classAvgRW: 'N/A', classAvgMath: 'N/A', classAvgTotal: 'N/A' };
+            // Also check if modules exist that could inform this standard test name (for modal purposes)
+            // For example, if "CB-T4" doesn't exist as aggregate, but "CB-T4-E1" does, we still want "CB Practice Test 4" row
+            let hasAnyModuleData = false;
+            if (feedNameForThisStandardTest && aggregateTestToModulesMap[feedNameForThisStandardTest]) {
+                const modules = aggregateTestToModulesMap[feedNameForThisStandardTest];
+                hasAnyModuleData = studentAggregated.some(row => 
+                    row.AssessmentSource === 'Canvas CB Module' && 
+                    modules.includes(row.AssessmentName)
+                );
+            }
+            // If an aggregate attempt is missing, but modules might exist, or it's genuinely unattempted
+            return { 
+                name: standardName, 
+                originalFeedName: feedNameForThisStandardTest, // Still useful for modal if modules exist
+                date: "N/A", rw: '-', math: '-', total: '-', 
+                classAvgRW: 'N/A', classAvgMath: 'N/A', classAvgTotal: 'N/A' 
+            };
         }
     });
     
     // Populate EOC with all chapters, marking N/A for unattempted
     Object.keys(eocChapters).forEach(subject => {
         transformed.eocQuizzes[subject] = eocChapters[subject].map(chapterNameFromList => {
-            // Find if the student has an attempt for this cleaned chapter name
             const attempt = studentAggregated.find(row => {
                 if (row.AssessmentSource !== 'Canvas EOC Practice') return false;
                 const cleanedFeedName = cleanAssessmentName(row.AssessmentName);
-                // Debugging log for EOC matching:
-                // if (subject === 'reading' && chapterNameFromList.includes("Vocab")) { // Example condition
-                //    console.log(`EOC Match Attempt: List='${chapterNameFromList}', FeedRaw='${row.AssessmentName}', FeedCleaned='${cleanedFeedName}'`);
-                // }
-                return cleanedFeedName.toLowerCase() === chapterNameFromList.toLowerCase() &&
-                       (inferSubject(row.AssessmentName) === subject || !inferSubject(row.AssessmentName));
+                const inferredSub = inferSubject(row.AssessmentName);
+                // console.log(`EOC Match: List='${chapterNameFromList}', FeedRaw='${row.AssessmentName}', Cleaned='${cleanedFeedName}', InferredSub='${inferredSub}', TargetSub='${subject}'`);
+                return cleanedFeedName.toLowerCase() === chapterNameFromList.toLowerCase() && (inferredSub === subject);
             });
             
             if (attempt) {
                 return {
-                    name: chapterNameFromList, // Display the clean name from our list
-                    originalName: attempt.AssessmentName, // Store original name if needed for modal filtering
+                    name: chapterNameFromList, 
+                    originalName: attempt.AssessmentName, 
                     latestScore: `${attempt.Score_Percentage || 'N/A'} (${attempt.Score_Raw_Combined || 'N/A'}/${attempt.PointsPossible_Combined || 'N/A'})`,
                     classAvg: attempt.ClassAverageScore_Normalized || "N/A",
                     date: formatDate(attempt.AttemptDate)
@@ -455,22 +466,22 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
 
     // Populate Khan Academy
     studentAggregated.forEach(row => {
-        const subject = inferSubject(row.AssessmentName); // Reuse inferSubject
+        const subject = inferSubject(row.AssessmentName);
         if (row.AssessmentSource === 'Khan Academy Practice' && subject && transformed.khanAcademy[subject]) {
             transformed.khanAcademy[subject].push({
-                name: row.AssessmentName, // Khan names are usually fine as is
+                name: row.AssessmentName, 
                 date: formatDate(row.AttemptDate),
                 score: `${row.Score_Raw_Combined || 'N/A'}/${row.PointsPossible_Combined || 'N/A'} (${row.Score_Percentage || 'N/A'})`,
                 pointsPossible: row.PointsPossible_Combined || "N/A",
-                classAvg: row.ClassAverageScore_Normalized || "N/A" // Or specific Khan class avg if feed provides
+                classAvg: row.ClassAverageScore_Normalized || "N/A" 
             });
         }
     });
     
-    // Populate CB Skills (from granularSkills derived from questionDetails)
+    // Populate CB Skills
     for (const skillName in granularSkills) {
         const data = granularSkills[skillName];
-        const category = skillToCategory(skillName); // Use the same mapping
+        const category = skillToCategory(skillName); 
         if (category !== 'Unknown' && transformed.cbSkills[category]) {
              transformed.cbSkills[category].push({
                 name: skillName,
@@ -480,10 +491,13 @@ function transformDataForDashboard(aggregatedDataArray, questionDetailsArray, lo
         }
     }
 
-    console.log("Transformed currentStudentData (final):", JSON.parse(JSON.stringify(transformed)));
+    console.log("Transformed currentStudentData (final for " + loggedInStudentGmailID + "):", JSON.parse(JSON.stringify(transformed)));
     return transformed;
 }
 
+// --- displayData and other UI functions (populateOverviewSnapshot, initializeOverviewCharts, etc.) ---
+// These should be largely the same as the previous version, but ensure they robustly handle
+// potentially "N/A" or missing data within the transformed currentStudentData.
 
 function displayData(studentData) {
     if (!studentData || !studentData.isDataAvailable) {
@@ -508,7 +522,7 @@ function displayData(studentData) {
 
     document.getElementById('studentNameDisplay').textContent = `Welcome, ${studentData.name}!`;
     
-    const overviewSnapshotDiv = document.getElementById('overview-content').querySelector('.grid.grid-cols-1'); // Target the div containing score cards
+    const overviewSnapshotDiv = document.getElementById('overview-content').querySelector('.grid.grid-cols-1');
     if (overviewSnapshotDiv && overviewSnapshotDiv.children.length >= 5) {
         const cards = overviewSnapshotDiv.children;
         cards[0].querySelector('.score-value').innerHTML = `${studentData.latestScores.total || 'N/A'} <span class="text-lg text-gray-500">/ 1600</span>`;
@@ -536,7 +550,7 @@ function displayData(studentData) {
     }
 
     populateOverviewSnapshot(studentData); 
-    if(document.getElementById('overview-content').classList.contains('hidden') === false) { // Only init if overview tab is active
+    if(document.getElementById('overview-content').classList.contains('hidden') === false) {
         initializeOverviewCharts(studentData);
     }
     populatePracticeTestsTable(studentData.cbPracticeTests);
@@ -548,9 +562,6 @@ function displayData(studentData) {
     });
 }
 
-// ... (keep populateOverviewSnapshot, initializeOverviewCharts, populatePracticeTestsTable, getPerformanceClass, populateCBSkills from previous version) ...
-// ... (modal functions: openModal, closeModal, window.onclick) ...
-// Ensure these functions are present from the previous script version. The following are repeated for completeness if needed.
 
 let scoreTrendChartInstance = null; 
 let overallSkillChartInstance = null;
@@ -580,7 +591,7 @@ function populateOverviewSnapshot(studentData) {
         });
          if ((studentData.improvements || []).length === 0) overviewImprovementsList.innerHTML = '<li>No specific improvement areas identified yet. (Ensure skill tags are populated in data)</li>';
     }
-    if(timeSpentOverviewDiv) { // Explicitly N/A as per plan
+    if(timeSpentOverviewDiv) { 
         timeSpentOverviewDiv.innerHTML = `<p class="text-gray-600">Your Avg: <span class="font-semibold">N/A</span></p><p class="text-gray-600">Class Avg: <span class="font-semibold">N/A</span></p><p class="text-xs text-gray-400">(Overall portal usage data not currently available)</p>`;
     }
 }
@@ -626,7 +637,7 @@ function initializeOverviewCharts(studentData) {
     }
 }
 
-function populatePracticeTestsTable(testsData) { // testsData is now the structured list from transformDataForDashboard
+function populatePracticeTestsTable(testsData) { 
     const cbTableBody = document.getElementById('cb-practice-tests-table-body');
     if (!cbTableBody) return;
     cbTableBody.innerHTML = ''; 
@@ -636,15 +647,10 @@ function populatePracticeTestsTable(testsData) { // testsData is now the structu
     }
     testsData.forEach(test => {
         const row = cbTableBody.insertRow();
-        // Only make row clickable if it's an actual attempt (e.g., date is not N/A)
         if (test.date !== "N/A") {
             row.className = 'clickable-row';
-            // For the modal, we need to pass the original feed name if different from display name.
-            // The feedNameToStandardTestName maps FEED_NAME -> DISPLAY_NAME. We need reverse or use feed name from source obj.
-            // For simplicity, we assume test.originalFeedName might be stored if needed.
-            // Or, the modal function will need to handle standard names to find module data.
-            // We pass the standard name (test.name) to openModal for now.
-            row.onclick = () => openModal(`${test.name} Details`, { type: 'cb_test', assessmentName: test.name, originalFeedName: test.originalFeedName || test.name });
+            // Pass the originalFeedName if it exists (for aggregate tests) or the display name
+            row.onclick = () => openModal(`${test.name} Details`, { type: 'cb_test', assessmentName: test.originalFeedName || test.name });
         }
         row.innerHTML = `<td>${test.name}</td><td>${test.date}</td><td>${test.rw}</td><td>${test.math}</td><td>${test.total}</td><td>${test.classAvgRW}</td><td>${test.classAvgMath}</td><td>${test.classAvgTotal}</td>`;
     });
@@ -666,7 +672,6 @@ function populateEOCTable(sectionKey, eocQuizDataForSubject) {
         const row = tbody.insertRow();
         if (item.latestScore !== "N/A") { 
             row.className = 'clickable-row';
-            // Pass the originalName (which is the AssessmentName from feed) to modal for filtering questionDetails
             row.onclick = () => openModal(`EOC Practice: ${item.name}`, { type: 'eoc_quiz', assessmentName: item.originalName || item.name }); 
         }
         row.innerHTML = `<td>${item.name}</td><td>${item.latestScore}</td><td>${item.date}</td><td>${item.classAvg}</td>`;
@@ -747,9 +752,10 @@ function openModal(title, contentDetails) {
     modalQuestionDetailsContainer.innerHTML = ''; 
     
     let assessmentNamesToFilterBy = [];
-    const baseAssessmentName = contentDetails.originalFeedName || contentDetails.assessmentName;
+    // Use contentDetails.assessmentName which should be the originalFeedName for CB Tests,
+    // or the original AssessmentName for EOCs/Khan.
+    const baseAssessmentName = contentDetails.assessmentName; 
 
-    // Check if this is an aggregate test that needs module questions
     if (aggregateTestToModulesMap[baseAssessmentName]) {
         assessmentNamesToFilterBy = aggregateTestToModulesMap[baseAssessmentName];
         console.log(`Modal: Aggregate test '${baseAssessmentName}', filtering for modules:`, assessmentNamesToFilterBy);
@@ -763,9 +769,9 @@ function openModal(title, contentDetails) {
     );
 
     if (studentQuestionDataForAssessment.length === 0) {
-        modalQuestionDetailsContainer.innerHTML = `<p>No detailed question data available for "${baseAssessmentName}". This might be an aggregate score entry, or question details are linked to sub-modules not yet mapped for modal view.</p>`;
+        modalQuestionDetailsContainer.innerHTML = `<p>No detailed question data available for "${baseAssessmentName}".</p>`;
          if (aggregateTestToModulesMap[baseAssessmentName]) {
-            modalQuestionDetailsContainer.innerHTML += `<p>Attempted to find questions for modules: ${assessmentNamesToFilterBy.join(', ')}.</p><p>Ensure 'aggregateTestToModulesMap' in script.js is correct and module names match 'AssessmentName' in QuestionDetails feed.</p>`;
+            modalQuestionDetailsContainer.innerHTML += `<p>Attempted to find questions for modules: ${assessmentNamesToFilterBy.join(', ')}.</p><p>Ensure 'aggregateTestToModulesMap' in script.js has correct module names that match 'AssessmentName' in your QuestionDetails feed.</p>`;
         }
     } else {
         studentQuestionDataForAssessment.sort((a,b) => (parseFloat(a.QuestionSequenceInQuiz) || 0) - (parseFloat(b.QuestionSequenceInQuiz) || 0) );
@@ -794,9 +800,12 @@ function openModal(title, contentDetails) {
                 classCorrectPercentText = `${classCorrectPercent.toFixed(0)}% ${classCorrectPercent > 75 ? '<span class="arrow-up">↑</span>' : (classCorrectPercent < 50 ? '<span class="arrow-down">↓</span>' : '')}`;
             }
 
+            // Include AssessmentName for questions from aggregate tests to show which module it's from
+            const questionOrigin = (assessmentNamesToFilterBy.length > 1) ? ` (${q.AssessmentName})` : '';
+
             d.className = `p-2 border rounded-md ${statusClass}`;
             d.innerHTML = `
-                <p class="font-medium text-gray-700">Q${q.QuestionSequenceInQuiz || (i+1)} (${q.AssessmentName}): ${q.QuestionText_fromMetadata || 'N/A'}</p>
+                <p class="font-medium text-gray-700">Q${q.QuestionSequenceInQuiz || (i+1)}${questionOrigin}: ${q.QuestionText_fromMetadata || 'N/A'}</p>
                 <p>Your Answer: <span class="font-semibold">${studentAnswer}</span> (${statusText})</p>
                 <p>Points: ${q.PointsEarned !== null && q.PointsEarned !== undefined ? q.PointsEarned : 0} / ${pointsPossible}</p>
                 <p>Skill: ${q.SAT_Skill_Tag || 'N/A'}</p>
