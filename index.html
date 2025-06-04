@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Hub (The SAT Hub Theme)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="antialiased">
+
+    <header class="sathub-header p-4 shadow-md">
+        <div class="container mx-auto flex flex-wrap items-center justify-between">
+            <div class="flex items-center">
+                <img src="YOUR_HOSTED_LOGO_URL_HERE" alt="The SAT Hub Logo" class="h-12 md:h-16 w-auto mr-2 md:mr-3 rounded-md"> 
+                <h1 class="sathub-header-title text-xl md:text-2xl font-bold">Analytics Hub</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="studentNameDisplay" class="text-sm hidden sm:block">Welcome, Alex Johnson!</span>
+                <button id="hamburgerButton" class="md:hidden text-f0f0f0 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto hidden md:flex">
+            <button data-main-tab="overview" class="main-tab-button active py-3 px-4">Overview</button>
+            <button data-main-tab="cb-practice-tests" class="main-tab-button py-3 px-4">CB Non-Adaptive Tests</button>
+            <button data-main-tab="reading" class="main-tab-button py-3 px-4">Reading</button>
+            <button data-main-tab="writing" class="main-tab-button py-3 px-4">Writing & Language</button>
+            <button data-main-tab="math" class="main-tab-button py-3 px-4">Math</button>
+        </div>
+        <div id="mobileMenu" class="hidden md:hidden absolute top-full left-0 right-0 bg-white shadow-xl z-40">
+            <a href="#" data-main-tab="overview" class="mobile-nav-link block py-3 px-4 text-gray-700 hover:bg-gray-100">Overview</a>
+            <a href="#" data-main-tab="cb-practice-tests" class="mobile-nav-link block py-3 px-4 text-gray-700 hover:bg-gray-100">CB Non-Adaptive Tests</a>
+            <a href="#" data-main-tab="reading" class="mobile-nav-link block py-3 px-4 text-gray-700 hover:bg-gray-100">Reading</a>
+            <a href="#" data-main-tab="writing" class="mobile-nav-link block py-3 px-4 text-gray-700 hover:bg-gray-100">Writing & Language</a>
+            <a href="#" data-main-tab="math" class="mobile-nav-link block py-3 px-4 text-gray-700 hover:bg-gray-100">Math</a>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-4 md:p-6">
+        <div id="overview-content" class="main-tab-content space-y-6">
+            <section class="themed-card"> 
+                <div class="themed-card-title-strip">Performance Snapshot</div>
+                <div class="themed-card-body">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+                        <div class="score-card"> 
+                            <h3 class="text-md font-medium text-gray-600">Latest Total Score</h3>
+                            <p class="text-3xl font-bold score-value">1250 <span class="text-lg text-gray-500">/ 1600</span></p>
+                            <p class="text-sm text-gray-500 mt-1">Class Avg: 1180</p>
+                        </div>
+                        <div class="score-card">
+                            <h3 class="text-md font-medium text-gray-600">Latest R&W Score</h3>
+                            <p class="text-3xl font-bold score-value">620 <span class="text-lg text-gray-500">/ 800</span></p>
+                            <p class="text-sm text-gray-500 mt-1">Class Avg: 590</p>
+                        </div>
+                        <div class="score-card">
+                            <h3 class="text-md font-medium text-gray-600">Latest Math Score</h3>
+                            <p class="text-3xl font-bold score-value">630 <span class="text-lg text-gray-500">/ 800</span></p>
+                            <p class="text-sm text-gray-500 mt-1">Class Avg: 590</p>
+                        </div>
+                        <div class="score-card">
+                            <h3 class="text-md font-medium text-gray-600">Avg EOC Practice Score</h3>
+                            <p class="text-3xl font-bold score-value">78%</p>
+                            <p class="text-sm text-gray-500 mt-1">Class Avg: 75%</p>
+                        </div>
+                         <div class="score-card">
+                            <h3 class="text-md font-medium text-gray-600">Your Target Score</h3>
+                            <p class="text-3xl font-bold" style="color: #8a3ffc;">1400</p> 
+                            <p class="text-sm text-gray-500 mt-1">Goal: +150 points</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                <div class="themed-card chart-container">
+                    <div class="themed-card-title-strip">Score Trend (CB Non-Adaptive Tests)</div>
+                    <div class="themed-card-body"><canvas id="scoreTrendChart" height="250"></canvas></div>
+                </div>
+                <div class="themed-card chart-container">
+                    <div class="themed-card-title-strip">Overall Skill Performance</div> 
+                    <div class="themed-card-body"><canvas id="overallSkillChart" height="250"></canvas></div>
+                </div>
+            </section>
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div class="themed-card"><div class="themed-card-title-strip">Identified Strengths</div><div class="themed-card-body"><ul id="overviewStrengthsList" class="list-disc list-inside space-y-1 text-gray-600"></ul></div></div>
+                <div class="themed-card"><div class="themed-card-title-strip">Areas for Improvement</div><div class="themed-card-body"><ul id="overviewImprovementsList" class="list-disc list-inside space-y-1 text-gray-600"></ul></div></div>
+                <div class="themed-card"><div class="themed-card-title-strip">Time Spent (Portal Usage)</div><div class="themed-card-body" id="timeSpentOverview"><p class="text-gray-600">Your Avg: <span class="font-semibold">120 min / day</span></p><p class="text-gray-600">Class Avg: <span class="font-semibold">130 min / day</span></p></div></div>
+            </section>
+        </div>
+
+        <div id="cb-practice-tests-content" class="main-tab-content hidden"><section class="themed-card"><div class="themed-card-title-strip">CB Non-Adaptive Tests</div><div class="themed-card-body overflow-x-auto"><table class="min-w-full table"><thead><tr><th>Test Name</th><th>Date Attempted</th><th>R&W Score</th><th>Math Score</th><th>Total Score</th><th>Class Avg R&W</th><th>Class Avg Math</th><th>Class Avg Total</th></tr></thead><tbody id="cb-practice-tests-table-body"></tbody></table></div></section></div>
+        
+        <div id="reading-content" class="main-tab-content hidden space-y-6">
+            <div class="flex flex-wrap space-x-2 mb-4 border-b pb-2"><button data-sub-tab="reading-eoc" class="sub-tab-button active">EOC Practice</button><button data-sub-tab="reading-khan" class="sub-tab-button">Khan Academy Practice</button><button data-sub-tab="reading-skills" class="sub-tab-button">Skills</button></div>
+            <div id="reading-eoc-content" class="sub-tab-content-panel"><section class="themed-card"><div class="themed-card-title-strip">Reading EOC Practice</div><div class="themed-card-body overflow-x-auto"><table class="min-w-full table"><thead id="reading-eoc-thead"></thead><tbody id="reading-eoc-tbody"></tbody></table></div></section></div>
+            <div id="reading-khan-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Khan Academy Practice - Reading</div><div class="themed-card-body" id="reading-khan-data"></div></section></div>
+            <div id="reading-skills-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Reading Skills</div><div class="themed-card-body space-y-3" id="reading-cb-skills-data"></div></section></div>
+        </div>
+
+        <div id="writing-content" class="main-tab-content hidden space-y-6">
+            <div class="flex flex-wrap space-x-2 mb-4 border-b pb-2"><button data-sub-tab="writing-eoc" class="sub-tab-button active">EOC Practice</button><button data-sub-tab="writing-khan" class="sub-tab-button">Khan Academy Practice</button><button data-sub-tab="writing-skills" class="sub-tab-button">Skills</button></div>
+            <div id="writing-eoc-content" class="sub-tab-content-panel"><section class="themed-card"><div class="themed-card-title-strip">Writing & Language EOC Practice</div><div class="themed-card-body overflow-x-auto"><table class="min-w-full table"><thead id="writing-eoc-thead"></thead><tbody id="writing-eoc-tbody"></tbody></table></div></section></div>
+            <div id="writing-khan-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Khan Academy Practice - Writing & Language</div><div class="themed-card-body" id="writing-khan-data"></div></section></div>
+            <div id="writing-skills-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Writing & Language Skills</div><div class="themed-card-body space-y-3" id="writing-cb-skills-data"></div></section></div>
+        </div>
+
+        <div id="math-content" class="main-tab-content hidden space-y-6">
+            <div class="flex flex-wrap space-x-2 mb-4 border-b pb-2"><button data-sub-tab="math-eoc" class="sub-tab-button active">EOC Practice</button><button data-sub-tab="math-khan" class="sub-tab-button">Khan Academy Practice</button><button data-sub-tab="math-skills" class="sub-tab-button">Skills</button></div>
+            <div id="math-eoc-content" class="sub-tab-content-panel"><section class="themed-card"><div class="themed-card-title-strip">Math EOC Practice</div><div class="themed-card-body overflow-x-auto"><table class="min-w-full table"><thead id="math-eoc-thead"></thead><tbody id="math-eoc-tbody"></tbody></table></div></section></div>
+            <div id="math-khan-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Khan Academy Practice - Math</div><div class="themed-card-body" id="math-khan-data"></div></section></div>
+            <div id="math-skills-content" class="sub-tab-content-panel hidden"><section class="themed-card"><div class="themed-card-title-strip">Math Skills</div><div class="themed-card-body space-y-3" id="math-cb-skills-data"></div></section></div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-100 border-t border-gray-200 mt-8">
+        <div class="container mx-auto py-4 px-6 text-center text-gray-600 text-sm">
+            &copy; <span id="currentYear"></span> The SAT Hub. All Rights Reserved.
+        </div>
+    </footer>
+
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="text-xl font-semibold">Detailed View</h2>
+                <span class="close-button" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody" class="modal-body-content space-y-4">
+                <p class="font-semibold">Question-wise Details:</p>
+                <div id="modalQuestionDetails" class="space-y-2 text-sm max-h-48 overflow-y-auto"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><p class="font-semibold text-center">Question Analysis (Sample)</p><canvas id="modalDonutChart" height="180"></canvas></div>
+                    <div><p class="font-semibold text-center">Your Score Trend (Sample)</p><canvas id="modalLineChart" height="180"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="script.js" defer></script>
+</body>
+</html>
